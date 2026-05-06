@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "hscore-client"
+version = "0.1.0"
+description = "HScore — hallucination and deception detection for LLMs (client)"
+readme = "README.md"
+license = { text = "Proprietary" }
+requires-python = ">=3.10"
+dependencies = [
+    "cryptography>=41.0",
+]
+
+[project.scripts]
+hscore-activate = "hscore.activate:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["hscore*"]
