@@ -7,6 +7,13 @@ build/
 venv/
 .env
 
+# macOS metadata
+.DS_Store
+**/.DS_Store
+
+# AI session data (Antigravity / Gemini)
+.gemini/
+
 # License files — never commit these
 ~/.hscore/
 *.hscore
