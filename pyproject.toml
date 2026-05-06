@@ -4,13 +4,22 @@ build-backend = "setuptools.backends.legacy:build"
 
 [project]
 name = "hscore-client"
-version = "0.1.0"
+version = "0.2.0"
 description = "HScore — hallucination and deception detection for LLMs (client)"
 readme = "README.md"
 license = { text = "Proprietary" }
 requires-python = ">=3.10"
 dependencies = [
     "cryptography>=41.0",
+    "numpy>=1.26",
+    "tqdm>=4.66",
+    "requests>=2.31",
+]
+
+[project.optional-dependencies]
+inference = [
+    "torch>=2.0",
+    "transformers>=4.40",
 ]
 
 [project.scripts]

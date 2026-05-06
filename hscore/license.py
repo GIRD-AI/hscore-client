@@ -9,7 +9,7 @@ Flow at startup:
      - Expired but within grace period → warn + proceed (no network needed)
      - Expired and past grace period → raise LicenseExpiredError
   4. Try online renewal if expiry < RENEW_THRESHOLD_DAYS away
-  5. Decrypt weights_key_enc → return AES key bytes
+  5. Decrypt weights_keys_enc[model_id] → return AES key bytes
 """
 
 from __future__ import annotations
@@ -130,12 +130,14 @@ def check_license(model_id: str | None = None) -> bytes:
     elif (expires_at - now).days < RENEW_THRESHOLD_DAYS:
         _try_renew_license(payload)
 
-    return _decrypt_weights_key(payload["weights_key_enc"], fingerprint)
+    return _decrypt_weights_key_for_model(payload, model_id, fingerprint)
 
 
 # ── Internal helpers ──────────────────────────────────────────────────────────
 
 def _split_payload(data: dict) -> tuple[dict, str]:
+    # Work on a copy so we don't mutate the caller's dict
+    data = dict(data)
     signature = data.pop("signature", None)
     if not signature:
         raise LicenseTamperedError("License file has no signature.")
@@ -162,7 +164,7 @@ def _verify_signature(payload: dict, signature_b64url: str) -> None:
 
 def _decrypt_weights_key(encrypted_b64: str, machine_fingerprint: str) -> bytes:
     """
-    Decrypt the AES-256 weights key.
+    Decrypt a single AES-256 weights key blob.
     Format: base64(salt[32] + iv[12] + auth_tag[16] + ciphertext[32])
     Key derived via PBKDF2-SHA512(machine_fingerprint, salt, 600_000 iterations).
     """
@@ -187,6 +189,41 @@ def _decrypt_weights_key(encrypted_b64: str, machine_fingerprint: str) -> bytes:
         raise LicenseTamperedError(
             "Weights key decryption failed — fingerprint mismatch or tampered blob."
         ) from e
+
+
+def _decrypt_weights_key_for_model(
+    payload: dict,
+    model_id: str | None,
+    machine_fingerprint: str,
+) -> bytes:
+    """
+    Select and decrypt the correct per-model weights key from the license payload.
+
+    Reads from ``weights_keys_enc`` (dict, current format).
+    If model_id is None, decrypts the first available key.
+    """
+    keys_enc: dict = payload.get("weights_keys_enc", {})
+
+    if not keys_enc:
+        raise LicenseError(
+            "License contains no probe weights keys. "
+            "Re-activate to download an updated license: "
+            "python -m hscore.activate --token <TOKEN>"
+        )
+
+    if model_id is not None:
+        if model_id not in keys_enc:
+            raise LicenseError(
+                f"Model '{model_id}' is not in your license's weights keys.\n"
+                f"Available: {list(keys_enc.keys())}\n"
+                f"Contact support@gird.ai to upgrade."
+            )
+        enc_b64 = keys_enc[model_id]
+    else:
+        # No model specified — decrypt the first key (single-model licenses)
+        enc_b64 = next(iter(keys_enc.values()))
+
+    return _decrypt_weights_key(enc_b64, machine_fingerprint)
 
 
 def _try_renew_license(payload: dict) -> None:

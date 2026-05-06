@@ -72,6 +72,23 @@ def _cmd_activate(token: str) -> None:
     print()
     print(f"License saved to {LICENSE_PATH}")
 
+    # Download probe weights for all licensed models
+    downloads: dict = data.get("model_downloads", {})
+    if downloads:
+        from .model import CACHE_DIR, _download_weights
+        CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        print()
+        print("Downloading probe weights…")
+        for mid, url in downloads.items():
+            dest = CACHE_DIR / f"{mid}.enc"
+            try:
+                _download_weights(mid, url, dest)
+                size_mb = dest.stat().st_size / 1_048_576
+                print(f"  ✓ {mid}  [{size_mb:.1f} MB]")
+            except Exception as exc:  # noqa: BLE001
+                print(f"  ⚠ {mid}: download failed ({exc})")
+                print("    You can retry by re-running: python -m hscore.activate --token <TOKEN>")
+
 
 def _cmd_renew() -> None:
     token       = _load_token()
